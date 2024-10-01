@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FCFS - Planificación de Procesos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f0f0;
+            color: #021024;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            display: flex;
+            width: 100%;
+        }
+        .form-section {
+            width: 40%;
+            padding-right: 20px;
+        }
+        .results-section {
+            width: 50%;
+            padding-left: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #021024;
+            font-size: 1.5em;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+            color: #021024;
+        }
+        input, button {
+            width: 95%;
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #052659;
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            border-color: #021024;
+            outline: none;
+        }
+        button {
+            background-color: #052659;
+            color: #ffffff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #021024;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 8px;
+            border: 1px solid #7DAACA;
+            text-align: left;
+            font-size: 0.9em;
+        }
+        th {
+            background-color: #C1EBFF;
+        }
+        #averagesFCFS {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+        }
+        #ganttChart {
+            margin-top: 20px;
+            width: 100%;
+            height: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="form-section">
+            <h1>FCFS - Planificación de Procesos</h1>
+            <label for="processNameFCFS">Nombre del proceso:</label>
+            <input type="text" id="processNameFCFS"><br>
+            <label for="arrivalTimeFCFS">Tiempo de llegada:</label>
+            <input type="number" id="arrivalTimeFCFS"><br>
+            <label for="burstTimeFCFS">Tiempo de ejecución:</label>
+            <input type="number" id="burstTimeFCFS"><br>
+            <button onclick="addProcess()">Agregar Proceso</button>
+            <button onclick="calculateFCFS()">Calcular FCFS</button>
+        </div>
+
+        <div class="results-section">
+            <h2>Procesos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Proceso</th>
+                        <th>Tiempo de Llegada</th>
+                        <th>Tiempo de Ejecución</th>
+                        <th>Tiempo Final</th>
+                        <th>Tiempo de Servicio</th>
+                        <th>Tiempo de Espera</th>
+                        <th>Rendimiento del Procesador (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="processTableFCFS">
+                    <!-- Aquí se llenarán los procesos -->
+                </tbody>
+            </table>
+            <div id="averagesFCFS"></div>
+            <canvas id="ganttChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let processes = [];
+
+        function addProcess() {
+            const processName = document.getElementById("processNameFCFS").value.trim();
+            const arrivalTime = parseInt(document.getElementById("arrivalTimeFCFS").value);
+            const burstTime = parseInt(document.getElementById("burstTimeFCFS").value);
+
+            if (processName && !isNaN(arrivalTime) && !isNaN(burstTime)) {
+                processes.push({
+                    name: processName,
+                    arrival: arrivalTime,
+                    burst: burstTime,
+                    completed: false,
+                });
+
+                document.getElementById("processNameFCFS").value = "";
+                document.getElementById("arrivalTimeFCFS").value = "";
+                document.getElementById("burstTimeFCFS").value = "";
+
+                updateProcessTable();
+            } else {
+                alert("Por favor, completa todos los campos correctamente.");
+            }
+        }
+
+        function calculateFCFS() {
+            let currentTime = 0;
+            let totalWaitingTime = 0;
+            let totalServiceTime = 0;
+            let ganttData = [];
+
+            processes.sort((a, b) => a.arrival - b.arrival); // Ordenar por tiempo de llegada
+
+            processes.forEach(process => {
+                if (currentTime < process.arrival) {
+                    currentTime = process.arrival; // Esperar hasta que llegue el proceso
+                }
+                ganttData.push({ name: process.name, start: currentTime, duration: process.burst });
+
+                currentTime += process.burst; // Agregar tiempo de ejecución
+                process.completionTime = currentTime;
+                process.serviceTime = process.completionTime - process.arrival; // Tiempo de servicio
+                process.waitingTime = process.serviceTime - process.burst; // Tiempo de espera
+                process.cpuUtilization = ((process.burst / process.serviceTime) * 100).toFixed(2);
+
+                // Acumular tiempos para el promedio
+                totalWaitingTime += process.waitingTime;
+                totalServiceTime += process.serviceTime;
+            });
+
+            updateProcessTable();
+            displayAverages(totalWaitingTime, totalServiceTime);
+            drawGanttChart(ganttData);
+        }
+
+        function updateProcessTable() {
+            const tableBody = document.getElementById("processTableFCFS");
+            tableBody.innerHTML = ""; // Limpiar la tabla
+
+            processes.forEach(process => {
+                const row = tableBody.insertRow();
+                row.insertCell(0).textContent = process.name;
+                row.insertCell(1).textContent = process.arrival;
+                row.insertCell(2).textContent = process.burst;
+                row.insertCell(3).textContent = process.completionTime !== undefined ? process.completionTime : "0";
+                row.insertCell(4).textContent = process.serviceTime !== undefined ? process.serviceTime : "0";
+                row.insertCell(5).textContent = process.waitingTime !== undefined ? process.waitingTime : "0";
+                row.insertCell(6).textContent = process.cpuUtilization !== undefined ? process.cpuUtilization : "0";
+            });
+        }
+
+        function displayAverages(totalWaitingTime, totalServiceTime) {
+            const avgWaitingTime = (totalWaitingTime / processes.length).toFixed(2);
+            const avgServiceTime = (totalServiceTime / processes.length).toFixed(2);
+
+            const averagesDiv = document.getElementById("averagesFCFS");
+            averagesDiv.innerHTML = `
+                Promedio de Tiempo de Espera: ${avgWaitingTime} <br>
+                Promedio de Tiempo de Servicio: ${avgServiceTime}
+            `;
+        }
+
+        function drawGanttChart(data) {
+            const ctx = document.getElementById("ganttChart").getContext("2d");
+            const labels = data.map(item => item.name);
+            const startTimes = data.map(item => item.start);
+            const durations = data.map(item => item.duration);
+            const endTimes = startTimes.map((start, index) => start + durations[index]);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Duración de Ejecución',
+                        data: durations,
+                        backgroundColor: 'rgba(0, 123, 255, 0.5)',
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Procesos'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tiempo'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value.toFixed(0);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
